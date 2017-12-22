@@ -1,0 +1,295 @@
+  - name: Disable SELINUX
+    lineinfile:
+      dest: /etc/selinux/config
+      regexp: '^SELINUX='
+      line: 'SELINUX=disabled'
+      state: present
+
+  - name: Stop and Disable Firewalld
+    systemd:
+      state: stopped
+      enabled: no
+      name: firewalld
+
+  - name: Yum update
+    yum:
+      name: '*'
+      state: latest
+
+  - name: Yum install package epel-release
+    yum:
+      name: epel-release
+      state: latest
+
+  - name: Yum install all packages 
+    yum: 
+      name={{item}} 
+      state=latest
+    with_items:
+      - system-storage-manager
+      - samba
+      - httpd
+      - net-tools
+      - mc
+      - wget
+      - nfs-utils
+      - ImageMagick
+      - libmspack
+      - ttmkfdir
+      - cabextract
+      - rpm-build
+      - unixODBC
+      - xorg-x11-fonts-Type1
+#      - xorg-x11-fonts-truetype
+      - curl
+      - cabextract
+      - xorg-x11-font-utils
+      - fontconfig
+
+  - name: Create groups (admins, users)
+    group:
+      name={{item}}
+      state=present
+    with_items:
+      - users
+      - admins
+
+  - name: Create users (admin, user)
+    user:
+      name: "{{ item.name }}"
+      groups: "{{ item.groups }}"
+      password: "{{ item.pwd }}"
+      state: present
+    with_items:
+      - { name: admin, groups: "admins,users", pwd: "{{ admin_pwd }}" }
+      - { name: user, groups: users, pwd: "{{ user_pwd }}" }
+
+  - name: Creates dirs DATADIR BACKUPS distr
+    file:
+      path: "{{ item.path }}"
+      owner: "{{ item.owner }}"
+      group: "{{ item.group }}"
+      state: directory
+      mode: 0755
+    with_items:
+      - { path: "/mnt/DATADIR", owner: user, group: users }
+      - { path: "/mnt/BACKUPS", owner: admin, group: admins } 
+      - { path: "/home/distr/rpm",  owner: admin, group: admins }
+      - { path: "/home/distr/postgres",  owner: admin, group: admins }
+      - { path: "/home/distr/1c-server",  owner: admin, group: admins }
+
+
+  - name: Copy distrib files
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dst }}"
+    with_items:
+      - { src: "rpm/msttcore-fonts-installer-2.6-1.noarch.rpm", dst: "/home/distr/rpm/" }
+
+  - name: Copy postgres server distrib files
+    copy:
+      src: "{{ item }}"
+      dest: /home/distr/postgres/
+    with_fileglob:
+      - postgres/*
+
+  - name: Copy 1C server distrib files
+    copy:
+      src: "{{ item }}"
+      dest: /home/distr/1c-server/
+    with_fileglob:
+      - 1c-server/*
+ 
+  - name: Ansible install rpm file glob
+    find:
+      paths: /home/distr/rpm/
+      patterns: "*.rpm"
+    register: rpm_files
+
+  - name: Yum localinstall all rpm packages
+    yum:
+      name={{item.path}}
+      state=present
+    with_items:
+      - "{{ rpm_files.files }}"
+
+  - name: Yum localinstall all postgres rpm packages
+    shell: yum localinstall -y *.rpm
+    args:
+      chdir: /home/distr/postgres/
+      warn: no
+
+  - name: Yum localinstall all 1c-server rpm packages
+    shell: yum localinstall -y *.rpm
+    args:
+      chdir: /home/distr/1c-server/
+      warn: no
+
+  - name: Create postgres password file
+    lineinfile:
+      path: /tmp/pwd
+      line: "{{ postgres_password }}"
+      state: present
+      create: yes
+
+  - name: initialize postgres
+    shell: /usr/pgsql-9.6/bin/initdb -D /var/lib/pgsql/9.6/data --locale=ru_RU.UTF-8 --pwfile=/tmp/pwd
+    args:
+      creates: /var/lib/pgsql/9.6/data/postgresql.conf
+    become: yes
+    become_user: postgres
+
+  - name: update host hb_pga.conf (md5)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/pg_hba.conf
+      regexp: '^host\s+all\s+all\s+0.0.0.0/0\s+trust'
+      line: "host	all	all	0.0.0.0/0	md5"
+      state: present
+
+  - name: update host hb_pga.conf (replication)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/pg_hba.conf
+      insertafter: EOF
+      line: "local	replication	postgres	trust"
+      state: present
+
+
+  - name: update host postgresql.conf (wal_level)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^wal_level"
+      insertafter: EOF
+      line: "wal_level = {{wal_level}}"
+      state: present
+
+  - name: update host postgresql.conf (max_wal_senders)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^max_wal_senders"
+      insertafter: EOF
+      line: "max_wal_senders = {{max_wal_senders}}"
+      state: present
+
+  - name: update host postgresql.conf (effective_cache_size)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^effective_cache_size"
+      insertafter: EOF
+      line: "effective_cache_size = {{effective_cache_size}}"
+      state: present
+
+  - name: update host postgresql.conf (wal_buffers)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^wal_buffers"
+      insertafter: EOF
+      line: "wal_buffers = {{wal_buffers}}"
+      state: present
+
+  - name: update host postgresql.conf (shared_buffers)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^shared_buffers"
+      insertafter: EOF
+      line: "shared_buffers = {{shared_buffers}}"
+      state: present
+
+  - name: update host postgresql.conf (temp_buffers)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^temp_buffers"
+      insertafter: EOF
+      line: "temp_buffers = {{temp_buffers}}"
+      state: present
+
+  - name: update host postgresql.conf (work_mem)
+    lineinfile:
+      path: /var/lib/pgsql/9.6/data/postgresql.conf
+      regexp: "^work_mem"
+      insertafter: EOF
+      line: "work_mem = {{work_mem}}"
+      state: present
+
+  - name: Start and Enable PostgreSQL
+    systemd:
+      name: postgresql-{{pg_version}}
+      state: started
+      enabled: True
+
+  - name: Add hostnmae in hosts
+    lineinfile:
+      path: /etc/hosts
+      regexp: "^{{ansible_hostname}}"
+      insertafter: EOF
+      line: "{{ansible_default_ipv4.address}}	{{ansible_hostname}}"
+      state: present
+
+  - name: chown /opt/1c
+    file: 
+      path: /opt/1C
+      recurse: yes
+      group: grp1cv{{version1c}}
+      owner: usr1cv{{version1c}}
+
+  - name: Fix /etc/init.d/srv1cvXX
+    lineinfile:
+      path: /etc/init.d/srv1cv{{version1c}}{{subversion1c}}
+      regexp: "^#!"
+      insertbefore: BOF
+      line: "#!/bin/bash"
+      state: present
+
+  - name: Start and Enable 1C-Server
+    systemd:
+      name: srv1cv{{version1c}}{{subversion1c}}
+      daemon-reload: yes
+      state: started
+      enabled: True
+
+  - name: Start HTTPD Server
+    systemd:
+      name: httpd
+      state: started
+      enabled: True
+
+  - name: create new httpd dir for 1C
+    file:
+      path: "{{httpd_path_1c}}"
+      owner: apache
+      group: apache
+      state: directory
+      mode: 0755
+
+  - name: initialize 1c-webserver
+    shell: /opt/1C/v{{version1c}}.{{subversion1c}}/x86_64/webinst -apache{{httpd_version}} -wsdir {{httpd_wsdir}} -dir {{httpd_path_1c}} -connstr "Srvr={{ansible_hostname}};Ref=’{{httpd_ref}}’;" -confPath /etc/httpd/conf/httpd.conf
+    args:
+      creates: "{{httpd_path_1c}}/default.vrd"
+    
+  - name: ReStart HTTPD Server
+    systemd:
+      name: httpd
+      state: restarted
+
+  - name: Copy Samba Config
+    copy:
+      src: conf/smb.conf
+      dest: /etc/samba/
+
+  - name: Start SMB Server
+    systemd:
+      name: smb
+      state: started
+      enabled: True
+
+  - name: Start NMB Server
+    systemd:
+      name: nmb
+      state: started
+      enabled: True
+
+  - name: Creates Samba Users
+    shell: (pdbedit -a -u={{ item.username }} 2>&1 > /dev/null) || (echo '{{ item.password }}'; echo '{{ item.password }}')
+    with_items: "{{ samba_users }}"
+
+
+

@@ -1,0 +1,28 @@
+# global variables
+
+pg_version: 9.6
+postgres_password: baza1c
+admin_pwd: "$6$HU3pwcxblzHeri.q$rNnpltwFOocKEfnD2OPtkSpSpLsx62YGpoSXDg03d1WR.qEoSq8qhLHYQtjYVHwB3mjg8odSIaBt6aHQXzSyz1"
+user_pwd: "$6$qZDDvrBPJq1KTojj$myCir5Yf.uUzjV4lQREhGTZOh9N4nXHWi3Ie1v4ohQpylXKwlyJfdlszkbU5uZmtnhjOtn7VRuNeswQac/1Dy"
+
+# postgresql.conf properties
+wal_level: hot_standby
+max_wal_senders: 2
+effective_cache_size: 8GB
+wal_buffers: -1
+shared_buffers: 2GB
+temp_buffers: 32MB
+work_mem: 32MB
+
+#1C Server variables
+version1c: 8
+subversion1c: 3
+
+#HTTPD
+httpd_version: 24
+httpd_ref: "manager 2017"
+httpd_wsdir: 1c
+httpd_path_1c: /home/www/1c
+
+#SAMBA
+samba_users: [{username: admin, password: admin}, {username: user, password: user}]

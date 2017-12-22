@@ -1,0 +1,10 @@
+#!/bin/bash
+
+BACKUP_PROG=/usr/pgsql-9.6/bin/pg_basebackup
+BACKUP_USER=postgres
+BACKUP_DIR=/mnt/BACKUPS/1c-backup
+BACKUP_FILE=backup_$(date +%Y-%m-%d_%H%M).tar.gz
+
+$BACKUP_PROG -x --format=tar -z -U $BACKUP_USER -D - | tee > $BACKUP_DIR/$BACKUP_FILE
+chmod 666 $BACKUP_DIR/$BACKUP_FILE
+

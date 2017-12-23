@@ -73,18 +73,21 @@
       mode: 0755
     with_items:
       - { path: "/mnt/DATADIR", owner: user, group: users }
-      - { path: "/mnt/BACKUPS", owner: admin, group: admins } 
+      - { path: "/mnt/BACKUPS/1c-backup", owner: admin, group: admins } 
       - { path: "/home/distr/rpm",  owner: admin, group: admins }
       - { path: "/home/distr/postgres",  owner: admin, group: admins }
-      - { path: "/home/distr/1c-server",  owner: admin, group: admins }
+      - { path: "/home/distr/1c-server/{{ build1c }}",  owner: admin, group: admins }
 
 
-  - name: Copy distrib files
+  - name: Copy some distrib files
     copy:
       src: "{{ item.src }}"
       dest: "{{ item.dst }}"
+      mode: "{{ item.mode }}"
     with_items:
-      - { src: "rpm/msttcore-fonts-installer-2.6-1.noarch.rpm", dst: "/home/distr/rpm/" }
+      - { src: "rpm/msttcore-fonts-installer-2.6-1.noarch.rpm", dst: "/home/distr/rpm/", mode: "0644" }
+      - { src: "scripts/backup1c", dst: "/usr/local/bin/", mode: "0755" }
+      - { src: "scripts/pg_restore", dst: "/usr/local/bin/", mode: "0755" }
 
   - name: Copy postgres server distrib files
     copy:
@@ -96,9 +99,9 @@
   - name: Copy 1C server distrib files
     copy:
       src: "{{ item }}"
-      dest: /home/distr/1c-server/
+      dest: "/home/distr/1c-server/{{ build1c }}/"
     with_fileglob:
-      - 1c-server/*
+      - "1c-server/{{ build1c }}/*"
  
   - name: Ansible install rpm file glob
     find:
@@ -122,7 +125,7 @@
   - name: Yum localinstall all 1c-server rpm packages
     shell: yum localinstall -y *.rpm
     args:
-      chdir: /home/distr/1c-server/
+      chdir: "/home/distr/1c-server/{{ build1c }}/"
       warn: no
 
   - name: Create postgres password file
@@ -291,5 +294,13 @@
     shell: (pdbedit -a -u={{ item.username }} 2>&1 > /dev/null) || (echo '{{ item.password }}'; echo '{{ item.password }}')
     with_items: "{{ samba_users }}"
 
+  - name: Configure crontab backups
+    cron:
+      name: backup postgres
+      minute: "0"
+      hour: "12,19"
+      job: "/usr/local/bin/backup1c"
 
-
+  - name: Please make next steps  
+    debug:
+      msg: "1. mount /dev/sdxN /mnt/DATADIR \n 2. mount /dev/sdxN /mnt/BACKUPS"

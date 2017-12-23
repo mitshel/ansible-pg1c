@@ -17,6 +17,7 @@ work_mem: 32MB
 #1C Server variables
 version1c: 8
 subversion1c: 3
+build1c: 2899
 
 #HTTPD
 httpd_version: 24

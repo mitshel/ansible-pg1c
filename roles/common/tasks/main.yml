@@ -45,6 +45,8 @@
       - cabextract
       - xorg-x11-font-utils
       - fontconfig
+      - vsftpd
+      - ftp
 
   - name: Create groups (admins, users)
     group:
@@ -64,6 +66,12 @@
       - { name: admin, groups: "admins,users", pwd: "{{ admin_pwd }}" }
       - { name: user, groups: users, pwd: "{{ user_pwd }}" }
 
+  - name: Start and Enable VSFTPD
+    systemd:
+      name: vsftpd
+      state: started
+      enabled: True
+
   - name: Creates dirs DATADIR BACKUPS distr
     file:
       path: "{{ item.path }}"
@@ -77,7 +85,6 @@
       - { path: "/home/distr/rpm",  owner: admin, group: admins }
       - { path: "/home/distr/postgres",  owner: admin, group: admins }
       - { path: "/home/distr/1c-server/{{ build1c }}",  owner: admin, group: admins }
-
 
   - name: Copy some distrib files
     copy:
@@ -249,6 +256,24 @@
       state: started
       enabled: True
 
+  - name: Creates 1c-volume dir
+    file:
+      path: "{{ item.path }}"
+      owner: "{{ item.owner }}"
+      group: "{{ item.group }}"
+      state: directory
+      mode: 0755
+    with_items:
+      - { path: "/mnt/BACKUPS/1c-volume", owner: usr1cv8, group: grp1cv8 }
+
+  - name: add admin, user into grp1cv8
+    user:
+      name: "{{ item }}"
+      groups: 'grp1cv8'
+    with_items:
+      - admin
+      - user
+
   - name: Start HTTPD Server
     systemd:
       name: httpd
@@ -291,8 +316,10 @@
       enabled: True
 
   - name: Creates Samba Users
-    shell: (pdbedit -a -u={{ item.username }} 2>&1 > /dev/null) || (echo '{{ item.password }}'; echo '{{ item.password }}')
-    with_items: "{{ samba_users }}"
+    shell: printf '{{ item.password }}\n{{ item.password }}\n' | (pdbedit -a -u={{ item.username }} -t 2>&1 > /dev/null) 
+    with_items: 
+      - { username: "admin", password: "admin" }
+      - { username: "user", password: "user" }
 
   - name: Configure crontab backups
     cron:

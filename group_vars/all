@@ -26,4 +26,4 @@ httpd_wsdir: 1c
 httpd_path_1c: /home/www/1c
 
 #SAMBA
-samba_users: [{username: admin, password: admin}, {username: user, password: user}]
+#samba_users: [{username: admin, password: admin}, {username: user, password: user}]
